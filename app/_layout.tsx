@@ -1,59 +1,127 @@
+// app/_layout.tsx
+import React, { useEffect, useState, createContext } from 'react';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
+import { useColorScheme as useSystemColorScheme } from 'react-native';
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect } from 'react';
-import 'react-native-reanimated';
+import { PaperProvider, MD3LightTheme, MD3DarkTheme } from 'react-native-paper';
+import { adaptNavigationTheme } from 'react-native-paper';
+import merge from 'deepmerge';
+import { AutocompleteDropdownContextProvider } from 'react-native-autocomplete-dropdown';
+import { LocationProvider } from '../context/LocationContext';
+import CustomSplash from '../components/SplashScreen';
 
-import { useColorScheme } from '@/components/useColorScheme';
+import { migrate } from '../lib/db';
+import { getThemeMode, setThemeMode as saveThemeMode, type ThemeMode } from '../lib/settingsRepo';
+import { LocationService, type LocationItem } from '../services/LocationService';
 
-export {
-  // Catch any errors thrown by the Layout component.
-  ErrorBoundary,
-} from 'expo-router';
-
-export const unstable_settings = {
-  // Ensure that reloading on `/modal` keeps a back button present.
-  initialRouteName: '(tabs)',
-};
-
-// Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
 
+export const ThemeModeContext = createContext({
+  mode: 'system' as ThemeMode,
+  setMode: (_m: ThemeMode) => {},
+});
+
+const lightTheme = {
+  ...MD3LightTheme,
+  colors: {
+    ...MD3LightTheme.colors,
+    primary: '#4C9A4E',
+    secondary: '#8CC63E',
+    background: '#F8F8F8',
+    surface: '#FFFFFF',
+    onSurface: '#2E2E2E',
+    onSurfaceVariant: '#857D7D',
+  },
+};
+
+const darkTheme = {
+  ...MD3DarkTheme,
+  colors: {
+    ...MD3DarkTheme.colors,
+    primary: '#4CAF50',
+    secondary: '#8BC34A',
+  },
+};
+
+const { LightTheme: PaperNavLight, DarkTheme: PaperNavDark } = adaptNavigationTheme({
+  reactNavigationLight: undefined,
+  reactNavigationDark: undefined,
+});
+
+const CombinedLightTheme = merge(PaperNavLight, lightTheme);
+const CombinedDarkTheme = merge(PaperNavDark, darkTheme);
+
 export default function RootLayout() {
+  const systemScheme = useSystemColorScheme();
+  const [mode, setModeState] = useState<ThemeMode>('system');
+  const [showSplash, setShowSplash] = useState(true);
+  const [initialLocation, setInitialLocation] = useState<LocationItem | null | undefined>(undefined);
+
   const [loaded, error] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
     ...FontAwesome.font,
   });
 
-  // Expo Router uses Error Boundaries to catch errors in the navigation tree.
+  const activeTheme =
+    mode === 'system'
+      ? systemScheme === 'dark'
+        ? CombinedDarkTheme
+        : CombinedLightTheme
+      : mode === 'dark'
+      ? CombinedDarkTheme
+      : CombinedLightTheme;
+
+  useEffect(() => {
+    (async () => {
+      await migrate();                         // 1) ensure DB / tables
+      const savedTheme = await getThemeMode(); // 2) theme
+      if (savedTheme) setModeState(savedTheme);
+
+      // 3) pre-load the saved location in the SAME shape used by the dropdown
+      const savedLocation = await LocationService.getLocation();
+      setInitialLocation(savedLocation);       // will be passed to LocationProvider
+    })().catch(console.error);
+  }, []);
+
+  const setMode = async (m: ThemeMode) => {
+    setModeState(m);
+    await saveThemeMode(m);
+  };
+
   useEffect(() => {
     if (error) throw error;
   }, [error]);
 
   useEffect(() => {
-    if (loaded) {
-      SplashScreen.hideAsync();
+    if (loaded && initialLocation !== undefined) {
+      const timer = setTimeout(async () => {
+        await SplashScreen.hideAsync();
+        setShowSplash(false);
+      }, 2000);
+      return () => clearTimeout(timer);
     }
-  }, [loaded]);
+  }, [loaded, initialLocation]);
 
-  if (!loaded) {
-    return null;
+  // Wait until fonts AND initialLocation are ready (undefined = not resolved yet)
+  if (!loaded || showSplash || initialLocation === undefined) {
+    return <CustomSplash />;
   }
 
-  return <RootLayoutNav />;
-}
-
-function RootLayoutNav() {
-  const colorScheme = useColorScheme();
-
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
-      </Stack>
-    </ThemeProvider>
+    <ThemeModeContext.Provider value={{ mode, setMode }}>
+      <PaperProvider theme={activeTheme}>
+        <AutocompleteDropdownContextProvider>
+          {/* Pass the preloaded location here */}
+          <LocationProvider initialLocation={initialLocation}>
+            <Stack>
+              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+              <Stack.Screen name="+not-found" />
+            </Stack>
+          </LocationProvider>
+        </AutocompleteDropdownContextProvider>
+      </PaperProvider>
+    </ThemeModeContext.Provider>
   );
 }
