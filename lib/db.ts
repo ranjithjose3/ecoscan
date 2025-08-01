@@ -20,7 +20,13 @@ export async function getDb(): Promise<SQLite.SQLiteDatabase> {
 /*                               MIGRATION LOGIC                               */
 /* -------------------------------------------------------------------------- */
 
-const DATABASE_VERSION = 2;
+/**
+ * Bump this when you add/modify tables or indexes.
+ * v1: settings
+ * v2: addresses (+ indexes/triggers)
+ * v3: events (+ indexes/triggers)
+ */
+const DATABASE_VERSION = 3;
 
 /**
  * Run database migrations and recommended PRAGMAs.
@@ -43,6 +49,7 @@ export async function migrate(): Promise<void> {
   await db.withExclusiveTransactionAsync(async () => {
     let v = currentVer;
 
+    /* ------------------------------ v0 -> v1 ------------------------------ */
     if (v === 0) {
       await db.execAsync(`
         CREATE TABLE IF NOT EXISTS settings (
@@ -53,8 +60,9 @@ export async function migrate(): Promise<void> {
       v = 1;
     }
 
+    /* ------------------------------ v1 -> v2 ------------------------------ */
     if (v === 1) {
-      // v1 -> v2: addresses table for LocationItem mapping
+      // addresses table for LocationItem mapping
       await db.execAsync(`
         CREATE TABLE IF NOT EXISTS addresses (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -62,7 +70,7 @@ export async function migrate(): Promise<void> {
           name TEXT,           -- from LocationItem.name
           area_name TEXT,      -- from LocationItem.area_name
           parcel_id INTEGER,   -- from LocationItem.parcel_id
-          place_id TEXT,       -- from LocationItem.place_id (unique-ish)
+          place_id TEXT,       -- from LocationItem.place_id (unique natural key)
           service_id INTEGER,  -- from LocationItem.service_id
           area_id INTEGER,     -- from LocationItem.area_id
           type TEXT,           -- from LocationItem.type
@@ -72,15 +80,9 @@ export async function migrate(): Promise<void> {
       `);
 
       // Unique & helpful indexes
-      await db.execAsync(`
-        CREATE UNIQUE INDEX IF NOT EXISTS ux_addresses_place_id ON addresses(place_id);
-      `);
-      await db.execAsync(`
-        CREATE INDEX IF NOT EXISTS idx_addresses_title ON addresses(title);
-      `);
-      await db.execAsync(`
-        CREATE INDEX IF NOT EXISTS idx_addresses_area_name ON addresses(area_name);
-      `);
+      await db.execAsync(`CREATE UNIQUE INDEX IF NOT EXISTS ux_addresses_place_id ON addresses(place_id);`);
+      await db.execAsync(`CREATE INDEX IF NOT EXISTS idx_addresses_title ON addresses(title);`);
+      await db.execAsync(`CREATE INDEX IF NOT EXISTS idx_addresses_area_name ON addresses(area_name);`);
 
       // Auto-update the updated_at column on UPDATE
       await db.execAsync(`
@@ -94,6 +96,48 @@ export async function migrate(): Promise<void> {
       `);
 
       v = 2;
+    }
+
+    /* ------------------------------ v2 -> v3 ------------------------------ */
+    if (v === 2) {
+      // events table: stores Recollect events keyed by API `id` (unique)
+      await db.execAsync(`
+        CREATE TABLE IF NOT EXISTS events (
+          id INTEGER PRIMARY KEY,          -- API event id (unique)
+          place_id TEXT NOT NULL,          -- selected place id
+          day TEXT NOT NULL,               -- YYYY-MM-DD
+          zone_id INTEGER,
+          custom_message TEXT,
+          custom_subject TEXT,
+          is_week_long INTEGER,            -- 0/1
+          event_type TEXT,
+          short_text_message TEXT,
+          name TEXT,
+          plain_text_message TEXT,
+          area_name TEXT,
+          service_name TEXT,
+          subject TEXT,
+          created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+          updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+        );
+      `);
+
+      // Indexes for common queries
+      await db.execAsync(`CREATE INDEX IF NOT EXISTS idx_events_place_day ON events(place_id, day);`);
+      await db.execAsync(`CREATE INDEX IF NOT EXISTS idx_events_zone ON events(zone_id);`);
+
+      // Auto-update updated_at on UPDATE
+      await db.execAsync(`
+        CREATE TRIGGER IF NOT EXISTS trg_events_updated
+        AFTER UPDATE ON events
+        FOR EACH ROW BEGIN
+          UPDATE events
+          SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
+          WHERE id = NEW.id;
+        END;
+      `);
+
+      v = 3;
     }
 
     await db.execAsync(`PRAGMA user_version = ${DATABASE_VERSION}`);
@@ -149,5 +193,11 @@ export async function withTransaction<T>(
   fn: (db: SQLite.SQLiteDatabase) => Promise<T>
 ): Promise<T> {
   const db = await getDb();
-  return db.withExclusiveTransactionAsync(async () => fn(db));
+
+  let result!: T; // will be assigned inside the transaction
+  await db.withExclusiveTransactionAsync(async () => {
+    result = await fn(db);
+  });
+
+  return result;
 }

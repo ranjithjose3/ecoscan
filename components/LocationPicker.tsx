@@ -17,8 +17,10 @@ export default function LocationPicker({ onSelect }: Props) {
 
   const dropdownController = useRef<any>(null);
 
-  // Prevent accidental clears when we programmatically set the dropdown item/text.
-  const suppressNullSelectRef = useRef(false);
+  // Ignore the next onSelect that echoes our programmatic set
+  const suppressNextSelectIdRef = useRef<string | null>(null);
+  // Simple duplicate debounce
+  const lastSelectedIdRef = useRef<string | null>(null);
 
   const fetchSuggestions = async (q: string) => {
     setQuery(q);
@@ -33,30 +35,35 @@ export default function LocationPicker({ onSelect }: Props) {
   };
 
   const handleSelect = (item: LocationItem | null) => {
-    // AutocompleteDropdown sometimes sends null during text changes or programmatic sets.
-    if (item == null) {
-      if (suppressNullSelectRef.current) {
-        // Ignore the one null caused by our own setItem/setInputText calls.
-        suppressNullSelectRef.current = false;
-        return;
-      }
-      // Ignore other nulls to avoid clearing persisted selection.
+    if (!item) return;
+
+    // 1) Suppress the "echo" select caused by programmatic set below
+    if (suppressNextSelectIdRef.current && item.id === suppressNextSelectIdRef.current) {
+      suppressNextSelectIdRef.current = null;
       return;
     }
 
-    // Resolve full suggestion (onSelectItem may pass only {id,title})
+    // 2) Ignore no-op select of the already-selected id
+    if (item.id && item.id === location?.id) return;
+
+    // 3) Debounce immediate duplicate emissions
+    if (item.id && item.id === lastSelectedIdRef.current) return;
+    lastSelectedIdRef.current = item.id ?? null;
+
+    // Ensure we pass a *full* object to context (not just {id,title})
     const full = suggestions.find(s => s.id === item.id) ?? item;
 
-    setLocation(full);     // persists selectedPlaceId, re-hydrates canonical value
+    setLocation(full);
     onSelect?.(full);
   };
 
-  // When the saved location loads or changes, push it into the dropdown UI.
+  // Mirror context → dropdown (when app loads or when selection is rehydrated)
   useEffect(() => {
     const ctl = dropdownController.current;
     if (!ctl) return;
 
-    suppressNullSelectRef.current = true; // next null from dropdown should be ignored
+    // The next select for this id will be an echo; ignore it once.
+    suppressNextSelectIdRef.current = location?.id ?? null;
 
     if (location?.id) {
       const title = location.title ?? location.name ?? '';
@@ -76,7 +83,7 @@ export default function LocationPicker({ onSelect }: Props) {
         dataSet={suggestions}
         onChangeText={fetchSuggestions}
         onSelectItem={handleSelect}
-        initialValue={location?.id}  // only at mount; effect keeps it synced
+        initialValue={location?.id} // only at mount; kept in sync by effect above
         useFilter={false}
         debounce={400}
         loading={loading}
