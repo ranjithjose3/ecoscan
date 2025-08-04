@@ -7,6 +7,11 @@ import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { PaperProvider, MD3LightTheme, MD3DarkTheme } from 'react-native-paper';
 import { adaptNavigationTheme } from 'react-native-paper';
+import {
+  DefaultTheme as NavigationDefaultTheme,
+  DarkTheme as NavigationDarkTheme,
+} from '@react-navigation/native';
+
 import merge from 'deepmerge';
 import { AutocompleteDropdownContextProvider } from 'react-native-autocomplete-dropdown';
 import { LocationProvider } from '../context/LocationContext';
@@ -15,6 +20,8 @@ import CustomSplash from '../components/SplashScreen';
 import { migrate } from '../lib/db';
 import { getThemeMode, setThemeMode as saveThemeMode, type ThemeMode } from '../lib/settingsRepo';
 import { LocationService, type LocationItem } from '../services/LocationService';
+//import { CombinedLightTheme, CombinedDarkTheme } from './theme';
+
 
 SplashScreen.preventAutoHideAsync();
 
@@ -45,9 +52,10 @@ const darkTheme = {
   },
 };
 
+
 const { LightTheme: PaperNavLight, DarkTheme: PaperNavDark } = adaptNavigationTheme({
-  reactNavigationLight: undefined,
-  reactNavigationDark: undefined,
+  reactNavigationLight: NavigationDefaultTheme,
+  reactNavigationDark: NavigationDarkTheme,
 });
 
 const CombinedLightTheme = merge(PaperNavLight, lightTheme);

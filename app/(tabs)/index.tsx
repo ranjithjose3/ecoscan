@@ -72,7 +72,7 @@ export default function IndexScreen() {
       <Divider style={{ marginVertical: 16 }} />
 
       {/* Event sync + view controls */}
-      <View style={styles.row}>
+      {/* <View style={styles.row}>
         <Button
           mode="contained-tonal"
           onPress={handleSync1}
@@ -89,8 +89,6 @@ export default function IndexScreen() {
         >
           Sync next 4 months
         </Button>
-
-        {/* Optional quick view toggles without syncing again */}
         <Button
           mode="text"
           onPress={() => setViewMonthsAhead(1)}
@@ -110,10 +108,9 @@ export default function IndexScreen() {
       <Text style={[theme.fonts.labelLarge, { marginTop: 16, marginBottom: 8 }]}>
         Events (from SQLite)
       </Text>
-      {/* 👇 Show as many months as selected above */}
       <EventsList placeId={location?.place_id} monthsAhead={viewMonthsAhead} />
 
-      <Divider style={{ marginVertical: 16 }} />
+      <Divider style={{ marginVertical: 16 }} /> */}
     </ScreenLayout>
   );
 }

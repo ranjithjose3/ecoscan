@@ -48,7 +48,7 @@ const typeColors: Record<string, string> = {
 };
 
 // ✅ 3. Generate AgendaList-friendly data
-export function getAgendaItems() {
+export function getAgendaItemsOld() {
   const grouped: Record<string, any[]> = {};
 
   collectionData.forEach((item) => {
@@ -66,7 +66,7 @@ export function getAgendaItems() {
 }
 
 // ✅ 4. Generate Calendar Marked Dates
-export function getMarkedDates() {
+export function getMarkedDatesOld() {
   const dates: any = {};
 
   collectionData.forEach((item) => {
