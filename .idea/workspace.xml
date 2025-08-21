@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="0bf633d7-d903-4866-bc10-0a878af7f6c1" name="Changes" comment="">
+      <change afterPath="$PROJECT_DIR$/.env" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/(tabs)/calendar.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/(tabs)/calendar.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/(tabs)/reminders.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/(tabs)/reminders.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/components/LocationPicker.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/LocationPicker.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/components/calender/AgendaItem.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/calender/AgendaItem.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/eas.json" beforeDir="false" afterPath="$PROJECT_DIR$/eas.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/db.ts" beforeDir="false" afterPath="$PROJECT_DIR$/lib/db.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/remindersBus.ts" beforeDir="false" afterPath="$PROJECT_DIR$/lib/remindersBus.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/LocationService.ts" beforeDir="false" afterPath="$PROJECT_DIR$/services/LocationService.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/utils/eventsData.ts" beforeDir="false" afterPath="$PROJECT_DIR$/utils/eventsData.ts" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="ProjectColorInfo"><![CDATA[{
+  "associatedIndex": 8
+}]]></component>
+  <component name="ProjectId" id="31c6FvQmfG2boH7Gr1oVRMK8QbL" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "git-widget-placeholder": "dev/featch-schedules",
+    "junie.onboarding.icon.badge.shown": "true",
+    "last_opened_file_path": "/home/rj/Documents/velo/ecoscan",
+    "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.tslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.tslint": "(autodetect)",
+    "nodejs_interpreter_path": "/home/rj/.asdf/installs/nodejs/24.1.0/bin/node",
+    "nodejs_package_manager_path": "npm",
+    "settings.editor.selected.configurable": "settings.nodejs",
+    "to.speed.mode.migration.done": "true",
+    "ts.external.directory.path": "/home/rj/Documents/velo/ecoscan/node_modules/typescript/lib",
+    "vue.rearranger.settings.migration": "true"
+  }
+}]]></component>
+  <component name="SharedIndexes">
+    <attachedChunks>
+      <set>
+        <option value="bundled-js-predefined-d6986cc7102b-e03c56caf84a-JavaScript-WS-252.23892.411" />
+      </set>
+    </attachedChunks>
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="0bf633d7-d903-4866-bc10-0a878af7f6c1" name="Changes" comment="" />
+      <created>1755810914015</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1755810914015</updated>
+      <workItem from="1755810915340" duration="6334000" />
+    </task>
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+</project>
