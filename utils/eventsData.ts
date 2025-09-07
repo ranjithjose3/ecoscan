@@ -39,36 +39,34 @@ export async function getAgendaItemsFromDb(
   //console.log('[getAgendaItemsFromDb] Rows:', rows[0]);
 
   const grouped: Record<string, Array<{
+    id: string; // Add unique identifier
     hour: string;
     title: string;
     name: string;
     subject: string;
-    custom_subject?: string;
-    custom_message?: string;
+    custom_subject?: string | null;
+    custom_message?: string | null;
     event_type: string;
     service_name: string;
     is_week_long: number;
     zone_id: number;
-    created_at: string;
-    updated_at: string;
   }>> = {};
 
   for (const e of rows) {
     if (!grouped[e.day]) grouped[e.day] = [];
 
     grouped[e.day].push({
+      id: `${e.id}-${e.day}`, // Create unique ID using event ID and date
       hour: 'All day',
       title: toTitle(e),
-      name: e.name,
-      subject: e.subject,
-      custom_subject: e.custom_subject,
-      custom_message: e.custom_message,
-      event_type: e.event_type,
-      service_name: e.service_name,
-      is_week_long: e.is_week_long,
-      zone_id: e.zone_id,
-      created_at: e.created_at,
-      updated_at: e.updated_at,
+      name: e.name || '',
+      subject: e.subject || '',
+      custom_subject: e.custom_subject || null,
+      custom_message: e.custom_message || null,
+      event_type: e.event_type || '',
+      service_name: e.service_name || '',
+      is_week_long: e.is_week_long || 0,
+      zone_id: e.zone_id || 0,
     });
   }
 

@@ -46,7 +46,7 @@ export default function TopBar({ title, subtitle }: TopBarProps) {
 
 const styles = StyleSheet.create({
   container: {
-    paddingVertical: 10,
+    paddingVertical: 8,
     paddingHorizontal: 16,
     borderBottomWidth: 1,
   },

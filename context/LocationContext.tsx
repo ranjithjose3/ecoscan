@@ -3,6 +3,11 @@ import React, { createContext, useContext, useEffect, useRef, useState } from 'r
 import { LocationItem, LocationService } from '../services/LocationService';
 import { syncEventsForPlaceFlexible } from '../services/EventsService';
 
+import Constants from 'expo-constants';
+const AUTO_SYNC_MONTHS_AHEAD = Number(Constants.expoConfig?.extra?.AUTO_SYNC_MONTHS_AHEAD) || 4;
+
+
+
 type SyncOptions = {
   startDate?: string | Date;
   endDate?: string | Date;
@@ -68,7 +73,7 @@ export const LocationProvider = ({ children, initialLocation }: ProviderProps) =
       const {
         startDate,
         endDate,
-        monthsAhead = 4,
+        monthsAhead = AUTO_SYNC_MONTHS_AHEAD,
         padBeforeDays = 0,
         padAfterDays = 0,
         locale = 'en',
@@ -126,7 +131,7 @@ export const LocationProvider = ({ children, initialLocation }: ProviderProps) =
         // Auto-sync default window after selection
         try {
           await runSync(hydrated.place_id, {
-            monthsAhead: 1,
+            monthsAhead: AUTO_SYNC_MONTHS_AHEAD,
             padBeforeDays: 0,
             padAfterDays: 0,
           });

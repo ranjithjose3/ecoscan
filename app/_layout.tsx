@@ -20,7 +20,7 @@ import CustomSplash from '../components/SplashScreen';
 import { migrate } from '../lib/db';
 import { getThemeMode, setThemeMode as saveThemeMode, type ThemeMode } from '../lib/settingsRepo';
 import { LocationService, type LocationItem } from '../services/LocationService';
-//import { CombinedLightTheme, CombinedDarkTheme } from './theme';
+import { CombinedLightTheme, CombinedDarkTheme } from '../lib/theme';
 
 
 SplashScreen.preventAutoHideAsync();
@@ -30,36 +30,6 @@ export const ThemeModeContext = createContext({
   setMode: (_m: ThemeMode) => {},
 });
 
-const lightTheme = {
-  ...MD3LightTheme,
-  colors: {
-    ...MD3LightTheme.colors,
-    primary: '#4C9A4E',
-    secondary: '#8CC63E',
-    background: '#F8F8F8',
-    surface: '#FFFFFF',
-    onSurface: '#2E2E2E',
-    onSurfaceVariant: '#857D7D',
-  },
-};
-
-const darkTheme = {
-  ...MD3DarkTheme,
-  colors: {
-    ...MD3DarkTheme.colors,
-    primary: '#4CAF50',
-    secondary: '#8BC34A',
-  },
-};
-
-
-const { LightTheme: PaperNavLight, DarkTheme: PaperNavDark } = adaptNavigationTheme({
-  reactNavigationLight: NavigationDefaultTheme,
-  reactNavigationDark: NavigationDarkTheme,
-});
-
-const CombinedLightTheme = merge(PaperNavLight, lightTheme);
-const CombinedDarkTheme = merge(PaperNavDark, darkTheme);
 
 export default function RootLayout() {
   const systemScheme = useSystemColorScheme();

@@ -7,6 +7,9 @@ import {
 } from '../lib/addressRepo';
 import { getSelectedPlaceId, setSelectedPlaceId } from '../lib/settingsRepo';
 import { migrate } from '../lib/db';
+import Constants from 'expo-constants';
+const AUTO_SYNC_MONTHS_AHEAD = Number(Constants.expoConfig?.extra?.AUTO_SYNC_MONTHS_AHEAD) || 4;
+
 
 export type LocationItem = {
   area_name: string;

@@ -13,25 +13,14 @@ import { ThemeModeContext } from '../_layout';
 import LocationPicker from '../../components/LocationPicker';
 import type { ThemeMode } from '../../lib/settingsRepo';
 import { useLocation } from '../../context/LocationContext';
-import EventsList from '../../components/EventsList';
+
+import Constants from 'expo-constants';
+const AUTO_SYNC_MONTHS_AHEAD = Number(Constants.expoConfig?.extra?.AUTO_SYNC_MONTHS_AHEAD) || 4;
 
 export default function IndexScreen() {
   const theme = useTheme();
   const { mode, setMode } = useContext(ThemeModeContext);
   const { location, syncEvents, syncing } = useLocation();
-
-  // 👇 Controls how much the list shows (today → +N months)
-  const [viewMonthsAhead, setViewMonthsAhead] = useState<number>(1);
-
-  const handleSync1 = async () => {
-    await syncEvents({ monthsAhead: 1 });
-    setViewMonthsAhead(1);            // show 1 month after syncing 1 month
-  };
-
-  const handleSync4 = async () => {
-    await syncEvents({ monthsAhead: 4 });
-    setViewMonthsAhead(4);            // show 4 months after syncing 4 months
-  };
 
   return (
     <ScreenLayout title="Ecoscan" subtitle="Profile / Settings" scrollable={false}>
@@ -70,47 +59,6 @@ export default function IndexScreen() {
       </Text>
 
       <Divider style={{ marginVertical: 16 }} />
-
-      {/* Event sync + view controls */}
-      {/* <View style={styles.row}>
-        <Button
-          mode="contained-tonal"
-          onPress={handleSync1}
-          loading={syncing}
-          disabled={syncing || !location?.place_id}
-        >
-          Sync next month
-        </Button>
-        <Button
-          mode="outlined"
-          onPress={handleSync4}
-          loading={syncing}
-          disabled={syncing || !location?.place_id}
-        >
-          Sync next 4 months
-        </Button>
-        <Button
-          mode="text"
-          onPress={() => setViewMonthsAhead(1)}
-          disabled={!location?.place_id}
-        >
-          View 1M
-        </Button>
-        <Button
-          mode="text"
-          onPress={() => setViewMonthsAhead(4)}
-          disabled={!location?.place_id}
-        >
-          View 4M
-        </Button>
-      </View>
-
-      <Text style={[theme.fonts.labelLarge, { marginTop: 16, marginBottom: 8 }]}>
-        Events (from SQLite)
-      </Text>
-      <EventsList placeId={location?.place_id} monthsAhead={viewMonthsAhead} />
-
-      <Divider style={{ marginVertical: 16 }} /> */}
     </ScreenLayout>
   );
 }

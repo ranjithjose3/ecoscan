@@ -1,6 +1,9 @@
 // services/EventsService.ts
 import { toEventRow, upsertEvents, type ApiEvent } from '../lib/eventsRepo';
 
+import Constants from 'expo-constants';
+const AUTO_SYNC_MONTHS_AHEAD = Number(Constants.expoConfig?.extra?.AUTO_SYNC_MONTHS_AHEAD) || 4;
+
 const SERVICE_ID = 1110;
 
 /* ------------------------------- Date helpers ------------------------------ */
@@ -113,7 +116,7 @@ export async function syncEventsForPlaceFlexible(opts: {
     placeId,
     startDate,
     endDate,
-    monthsAhead = 4,
+    monthsAhead = AUTO_SYNC_MONTHS_AHEAD,
     padBeforeDays = 0,
     padAfterDays = 0,
     locale = 'en',

@@ -23,7 +23,7 @@ export default function ScreenLayout({
   title,
   subtitle,
   scrollable = true,
-  edges = ['top', 'left', 'right', 'bottom'], 
+  edges = ['top', 'left', 'right'], 
 }: ScreenLayoutProps) {
   const theme = useTheme();
 
@@ -47,7 +47,7 @@ export default function ScreenLayout({
       >
         {title && <TopBar title={title} subtitle={subtitle} />}
 
-        <Card.Content style={[{ paddingVertical: 5 }, contentStyle]}>
+        <Card.Content style={[{ paddingVertical: 1 }, contentStyle]}>
           {scrollable ? (
             <ScrollView
               contentContainerStyle={{ padding: 0 }}

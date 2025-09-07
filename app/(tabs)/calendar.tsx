@@ -21,11 +21,13 @@ import { useLocation } from '../../context/LocationContext';
 import {
   getMarkedDatesFromDb,
   getAgendaItemsFromDb,
-  fmt,
-  addMonthsSafe
+  fmt
 } from '../../utils/eventsData';
 import AgendaItem from '../../components/calender/AgendaItem';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+
+import Constants from 'expo-constants';
+const CALENDAR_MONTHS_AHEAD = Number(Constants.expoConfig?.extra?.CALENDAR_MONTHS_AHEAD) || 3;
 
 const CHEVRON = require('../../assets/img/next.png');
 
@@ -40,7 +42,7 @@ export default function CalendarScreen({ weekView = false }: { weekView?: boolea
   const [markedDates, setMarkedDates] = useState<Record<string, any>>({});
   const [sections, setSections] = useState<Array<{ title: string; data: any[] }>>([]);
   const [loading, setLoading] = useState(false);
-  const [monthsAhead, setMonthsAhead] = useState(3);
+  const [monthsAhead, setMonthsAhead] = useState(CALENDAR_MONTHS_AHEAD);
 
   const { after, before, minDate, maxDate } = useMemo(() => {
     const now = new Date();
@@ -129,7 +131,7 @@ export default function CalendarScreen({ weekView = false }: { weekView?: boolea
     }, [location?.place_id, after, before])
   );
 
-  const renderItem = useCallback(({ item }: any) => <AgendaItem item={item} />, []);
+  const renderItem = useCallback(({ item }: any) => <AgendaItem key={item.id} item={item} />, []);
 
   // Show loading only if no data loaded yet
   if (loading && sections.length === 0) {

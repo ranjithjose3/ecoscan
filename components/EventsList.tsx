@@ -6,6 +6,9 @@ import { useFocusEffect } from 'expo-router';
 import { listEventsByPlaceAndRange, type EventRow } from '../lib/eventsRepo';
 import { useLocation } from '../context/LocationContext';
 
+import Constants from 'expo-constants';
+const AUTO_SYNC_MONTHS_AHEAD = Number(Constants.expoConfig?.extra?.AUTO_SYNC_MONTHS_AHEAD) || 4;
+
 /* ------------------------------- date helpers ------------------------------ */
 function pad2(n: number) { return String(n).padStart(2, '0'); }
 function fmt(d: Date): string { return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; }
@@ -31,7 +34,7 @@ export default function EventsList({
   placeId: placeIdProp,
   startDate,
   endDate,
-  monthsAhead = 1,
+  monthsAhead = AUTO_SYNC_MONTHS_AHEAD,
   emptyText = 'No events in this period.',
 }: Props) {
   const theme = useTheme();

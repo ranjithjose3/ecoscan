@@ -52,6 +52,8 @@
       "typedRoutes": true
     },
     "extra": {
+      "AUTO_SYNC_MONTHS_AHEAD": 6,
+      "CALENDAR_MONTHS_AHEAD": 3,
       "router": {},
       "eas": {
         "projectId": "894cdef4-20c4-4a88-a1a4-ca66be83ece3"
