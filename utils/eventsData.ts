@@ -1,5 +1,6 @@
 // utils/eventsData.ts
 import { listEventsByPlaceAndRange, type EventRow } from '../lib/eventsRepo';
+import { listRemindersByPlaceAndRange } from '../lib/remindersRepo';
 
 /** Color mapping similar to your mock utils */
 const typeColors: Record<string, string> = {
@@ -28,45 +29,60 @@ function toTitle(e: EventRow): string {
   return capitalize(n);
 }
 
-/** SQLite → AgendaList sections: [{ title: 'YYYY-MM-DD', data: [{ hour, title }, ...] }] */
+/** SQLite → AgendaList sections: [{ title: 'YYYY-MM-DD', data: [...] }] */
 export async function getAgendaItemsFromDb(
   placeId: string,
   after: string,  // 'YYYY-MM-DD'
   before: string, // 'YYYY-MM-DD'
 ) {
-  const rows = await listEventsByPlaceAndRange(placeId, after, before);
+  // Preload events and reminders once for the range
+  const [rows, reminders] = await Promise.all([
+    listEventsByPlaceAndRange(placeId, after, before),
+    listRemindersByPlaceAndRange(placeId, after, before), // uses event_date range
+  ]);
 
-  //console.log('[getAgendaItemsFromDb] Rows:', rows[0]);
+  // Quick lookup: which event_ids already have reminders?
+  const reminderEventIds = new Set(reminders.map(r => r.event_id));
 
   const grouped: Record<string, Array<{
-    id: string; // Add unique identifier
+    id: number;
+    place_id: string;
+    day: string;
     hour: string;
     title: string;
-    name: string;
-    subject: string;
+    name?: string | null;
+    subject?: string | null;
     custom_subject?: string | null;
     custom_message?: string | null;
-    event_type: string;
-    service_name: string;
-    is_week_long: number;
-    zone_id: number;
+    event_type?: string | null;
+    service_name?: string | null;
+    is_week_long?: number | null;
+    zone_id?: number | null;
+    created_at?: string;
+    updated_at?: string;
+    hasReminder: boolean;
   }>> = {};
 
   for (const e of rows) {
     if (!grouped[e.day]) grouped[e.day] = [];
 
     grouped[e.day].push({
-      id: `${e.id}-${e.day}`, // Create unique ID using event ID and date
+      id: e.id,                 // <-- needed by AgendaItem
+      place_id: e.place_id,     // <-- needed by AgendaItem (fallback)
+      day: e.day,               // <-- needed by AgendaItem
       hour: 'All day',
       title: toTitle(e),
-      name: e.name || '',
-      subject: e.subject || '',
-      custom_subject: e.custom_subject || null,
-      custom_message: e.custom_message || null,
-      event_type: e.event_type || '',
-      service_name: e.service_name || '',
-      is_week_long: e.is_week_long || 0,
-      zone_id: e.zone_id || 0,
+      name: e.name ?? null,
+      subject: e.subject ?? null,
+      custom_subject: e.custom_subject ?? null,
+      custom_message: e.custom_message ?? null,
+      event_type: e.event_type ?? null,
+      service_name: e.service_name ?? null,
+      is_week_long: e.is_week_long ?? null,
+      zone_id: e.zone_id ?? null,
+      created_at: (e as any).created_at,
+      updated_at: (e as any).updated_at,
+      hasReminder: reminderEventIds.has(e.id), // <-- precomputed
     });
   }
 
@@ -78,7 +94,6 @@ export async function getAgendaItemsFromDb(
     }));
 }
 
-
 /** SQLite → markedDates: { 'YYYY-MM-DD': { dots: [{color}], marked: true }, ... } */
 export async function getMarkedDatesFromDb(
   placeId: string,
@@ -86,10 +101,7 @@ export async function getMarkedDatesFromDb(
   before: string,
 ) {
   const rows = await listEventsByPlaceAndRange(placeId, after, before);
-  const dates: Record<
-    string,
-    { dots: Array<{ color: string }>; marked: boolean }
-  > = {};
+  const dates: Record<string, { dots: Array<{ color: string }>; marked: boolean }> = {};
 
   for (const e of rows) {
     const day = e.day;
@@ -103,6 +115,16 @@ export async function getMarkedDatesFromDb(
   return dates;
 }
 
+/** (Optional) reminder days (based on event_date) to add a purple dot in calendar */
+export async function getReminderDatesFromDb(
+  placeId: string,
+  after: string,
+  before: string,
+) {
+  const rems = await listRemindersByPlaceAndRange(placeId, after, before);
+  return new Set(rems.map(r => r.event_date));
+}
+
 /* ------------------------------- date helpers ------------------------------ */
 function pad2(n: number) { return String(n).padStart(2, '0'); }
 export function fmt(d: Date): string { return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; }
@@ -113,6 +135,4 @@ export function addMonthsSafe(d: Date, m: number) {
   if (nd.getDate() !== orig) nd.setDate(0);
   return nd;
 }
-function capitalize(s: string) {
-  return s.replace(/\b\w/g, (l) => l.toUpperCase());
-}
+function capitalize(s: string) { return s.replace(/\b\w/g, (l) => l.toUpperCase()); }

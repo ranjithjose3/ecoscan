@@ -1,88 +1,119 @@
-import React, { useCallback, useState } from 'react';
-import { StyleSheet, View, TouchableOpacity } from 'react-native';
-import { Text, Button, Portal, Modal, Surface, useTheme, TextInput } from 'react-native-paper';
+// components/calender/AgendaItem.tsx
+import isEmpty from 'lodash/isEmpty';
+import React, { useCallback, useEffect, useState } from 'react';
+import { StyleSheet, View, TouchableOpacity, Alert } from 'react-native';
+import { Text, Portal, Modal, Surface, useTheme, IconButton, Button } from 'react-native-paper';
 import testIDs from '../../utils/testIDs';
 import { useLocation } from '../../context/LocationContext';
-import { upsertReminder, getReminderByEvent, type NewReminder } from '../../lib/remindersRepo';
+import { upsertReminder, deleteReminderByEvent, getReminderByEvent } from '../../lib/remindersRepo';
+import { remindersBus } from '../../lib/remindersBus';
+
+type AgendaEventItem = {
+  id: number;
+  place_id: string;
+  day: string;                    // YYYY-MM-DD
+  title: string;
+
+  name?: string | null;
+  subject?: string | null;
+  custom_subject?: string | null;
+  custom_message?: string | null;
+  event_type?: string | null;
+  service_name?: string | null;
+
+  hasReminder?: boolean;          // precomputed by utils/eventsData.ts
+};
 
 interface ItemProps {
-  item: any;
-}
-
-// Replace lodash isEmpty with simple utility
-function isEmpty(obj: any): boolean {
-  return obj == null || Object.keys(obj).length === 0;
+  item: AgendaEventItem | Record<string, never>;
 }
 
 const AgendaItem = ({ item }: ItemProps) => {
-  const [visible, setVisible] = useState(false);
-  const [reminderModalVisible, setReminderModalVisible] = useState(false);
-  const [reminderNote, setReminderNote] = useState('');
-  const [hasReminder, setHasReminder] = useState(false);
-  const [loading, setLoading] = useState(false);
   const theme = useTheme();
   const { location } = useLocation();
+
+  const [visible, setVisible] = useState(false);
+  const [hasReminder, setHasReminder] = useState<boolean>(!!(item as AgendaEventItem)?.hasReminder);
+  const [pending, setPending] = useState(false);
 
   const showModal = () => setVisible(true);
   const hideModal = () => setVisible(false);
 
-  const checkExistingReminder = useCallback(async () => {
-    if (!location?.place_id || !item.id) return;
+  // Sync local state when the event changes or when parent precomputed hasReminder changes
+  useEffect(() => {
+    const it = item as AgendaEventItem;
+    setHasReminder(!!it?.hasReminder);
+  }, [(item as AgendaEventItem)?.id, (item as AgendaEventItem)?.place_id, (item as AgendaEventItem)?.day]);
 
-    try {
-      // Extract event ID from the item ID (format: "eventId-date")
-      const eventId = parseInt(item.id.split('-')[0]);
-      const existing = await getReminderByEvent(eventId, location.place_id);
-      setHasReminder(!!existing);
-      if (existing?.note) {
-        setReminderNote(existing.note);
+  // Defensive warm-up if hasReminder wasn't provided
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const it = item as AgendaEventItem;
+      const placeId = location?.place_id ?? it?.place_id;
+      if (it?.id && placeId && typeof it.hasReminder === 'undefined') {
+        try {
+          const existing = await getReminderByEvent(it.id, placeId);
+          if (!cancelled) setHasReminder(!!existing);
+        } catch (e) {
+          console.error('[AgendaItem] warmup getReminderByEvent failed:', e);
+        }
       }
-    } catch (error) {
-      console.error('Error checking existing reminder:', error);
-    }
-  }, [location?.place_id, item.id]);
+    })();
+    return () => { cancelled = true; };
+  }, [(item as AgendaEventItem)?.id, (item as AgendaEventItem)?.hasReminder, location?.place_id]);
 
-  React.useEffect(() => {
-    checkExistingReminder();
-  }, [checkExistingReminder]);
+  // 🔁 Listen for cross-screen changes (e.g. deletions from ReminderScreen)
+  useEffect(() => {
+    const it = item as AgendaEventItem;
+    const unsubscribe = remindersBus.on((chg) => {
+      const placeId = location?.place_id ?? it?.place_id;
+      if (!placeId || chg.place_id !== placeId) return;
+      if (chg.event_id === it.id) {
+        setHasReminder(chg.hasReminder);
+      }
+    });
+    return unsubscribe;
+  }, [item, location?.place_id]);
 
-  const handleAddReminder = () => {
-    setReminderModalVisible(true);
-  };
+  const onPressRow = useCallback(() => {}, []);
 
-  const handleSaveReminder = async () => {
-    if (!location?.place_id || !item.id) return;
+  const toggleReminder = useCallback(async () => {
+    if (pending) return;
+    const it = item as AgendaEventItem;
+    const placeId = location?.place_id ?? it?.place_id;
 
-    setLoading(true);
+    if (!it?.id) return Alert.alert('Oops', 'Missing event id.');
+    if (!placeId) return Alert.alert('Oops', 'Missing place id.');
+
     try {
-      // Extract event ID from the item ID (format: "eventId-date")
-      const eventId = parseInt(item.id.split('-')[0]);
-      const eventDate = item.id.split('-').slice(1).join('-'); // Get date part
-
-      const newReminder: NewReminder = {
-        event_id: eventId,
-        place_id: location.place_id,
-        event_date: eventDate,
-        note: reminderNote.trim() || null,
-        place_title: location.title,
-        event_title: item.title,
-        service_name: item.service_name,
-        event_type: item.event_type,
-      };
-
-      await upsertReminder(newReminder);
-      setHasReminder(true);
-      setReminderModalVisible(false);
-    } catch (error) {
-      console.error('Error saving reminder:', error);
+      setPending(true);
+      const exists = await getReminderByEvent(it.id, placeId);
+      if (exists) {
+        await deleteReminderByEvent(it.id, placeId);
+        setHasReminder(false);
+        remindersBus.emit({ event_id: it.id, place_id: placeId, hasReminder: false });
+      } else {
+        await upsertReminder({
+          event_id: it.id,
+          place_id: placeId,
+          event_date: it.day,
+          note: null,
+          place_title: location?.title ?? null,
+          event_title: it.title ?? null,
+          service_name: it.service_name ?? null,
+          event_type: it.event_type ?? null,
+        });
+        setHasReminder(true);
+        remindersBus.emit({ event_id: it.id, place_id: placeId, hasReminder: true });
+      }
+    } catch (e) {
+      console.error('[AgendaItem] toggleReminder failed:', e);
+      Alert.alert('Error', 'Unable to update reminder. See console for details.');
     } finally {
-      setLoading(false);
+      setPending(false);
     }
-  };
-
-  const itemPressed = useCallback(() => {
-    // Optional: Handle main row press
-  }, [item]);
+  }, [item, location?.place_id, location?.title, pending]);
 
   if (isEmpty(item)) {
     return (
@@ -94,103 +125,72 @@ const AgendaItem = ({ item }: ItemProps) => {
     );
   }
 
+  const it = item as AgendaEventItem;
+  const subline = it.custom_subject ?? it.subject ?? '';
+
+  const bellIcon = hasReminder ? 'bell-ring' : 'bell-plus-outline';
+  const bellColor = pending
+    ? (theme.colors as any).onSurfaceDisabled ?? theme.colors.onSurface
+    : hasReminder
+      ? theme.colors.primary
+      : theme.colors.onSurfaceVariant;
+  const viewIconColor = theme.colors.onSurfaceVariant;
+
   return (
     <>
       <TouchableOpacity
-        onPress={itemPressed}
-        style={[styles.item, { borderBottomColor: theme.colors.outlineVariant, backgroundColor: theme.colors.surface }]}
+        onPress={onPressRow}
+        style={[
+          styles.item,
+          { borderBottomColor: theme.colors.outlineVariant, backgroundColor: theme.colors.surface },
+        ]}
         testID={testIDs.agenda.ITEM}
       >
-        <View>
-          <Text style={{ color: theme.colors.onSurface }}>{item.hour}</Text>
-          {item.duration && (
-            <Text style={{ color: theme.colors.onSurfaceVariant, fontSize: 12, marginTop: 4, marginLeft: 4 }}>
-              {item.duration}
+        <View style={styles.textCol}>
+          <Text style={[styles.title, { color: theme.colors.onSurface }]} numberOfLines={2}>
+            {it.title}
+          </Text>
+          {!!subline && (
+            <Text style={[styles.subtitle, { color: theme.colors.onSurfaceVariant }]} numberOfLines={2}>
+              {subline}
             </Text>
           )}
         </View>
-        <Text style={[styles.itemTitleText, { color: theme.colors.onSurface }]}>{item.title}</Text>
-        <View style={styles.itemButtonContainer}>
-          <Button mode="text" onPress={showModal}>
-            Info
-          </Button>
-          <Button
-            mode={hasReminder ? "contained" : "outlined"}
-            onPress={handleAddReminder}
-            icon={hasReminder ? "bell" : "bell-plus"}
-            compact
-          >
-            {hasReminder ? "✓" : "Remind"}
-          </Button>
+
+        <View style={styles.actions}>
+          <IconButton
+            icon="eye-outline"
+            onPress={() => setVisible(true)}
+            accessibilityLabel="View details"
+            color={viewIconColor}
+            iconColor={viewIconColor}
+            style={styles.iconBtn}
+          />
+          <IconButton
+            icon={bellIcon}
+            onPress={toggleReminder}
+            disabled={pending}
+            accessibilityLabel={hasReminder ? 'Remove reminder' : 'Add reminder'}
+            color={bellColor}
+            iconColor={bellColor}
+            style={styles.iconBtn}
+          />
         </View>
       </TouchableOpacity>
 
-      {/* Info Modal */}
       <Portal>
         <Modal
           visible={visible}
-          onDismiss={hideModal}
+          onDismiss={() => setVisible(false)}
           contentContainerStyle={[styles.modalContent, { backgroundColor: theme.colors.background }]}
         >
           <Surface style={styles.modalSurface} elevation={0}>
-            <Text variant="titleMedium" style={styles.modalTitle}>{item.title}</Text>
-
-            <Text variant="bodyMedium"><Text style={styles.label}>Subject:</Text> {item.custom_subject || item.subject || 'N/A'}</Text>
-            <Text variant="bodyMedium"><Text style={styles.label}>Message:</Text> {item.custom_message || 'No message available.'}</Text>
-            <Text variant="bodyMedium"><Text style={styles.label}>Event Type:</Text> {item.event_type}</Text>
-            <Text variant="bodyMedium"><Text style={styles.label}>Name:</Text> {item.name}</Text>
-            <Text variant="bodyMedium"><Text style={styles.label}>Service:</Text> {item.service_name}</Text>
-
-            <Button mode="outlined" style={styles.modalClose} onPress={hideModal}>
-              Close
-            </Button>
-          </Surface>
-        </Modal>
-      </Portal>
-
-      {/* Reminder Modal */}
-      <Portal>
-        <Modal
-          visible={reminderModalVisible}
-          onDismiss={() => setReminderModalVisible(false)}
-          contentContainerStyle={[styles.modalContent, { backgroundColor: theme.colors.background }]}
-        >
-          <Surface style={styles.modalSurface} elevation={0}>
-            <Text variant="titleMedium" style={styles.modalTitle}>
-              {hasReminder ? 'Update Reminder' : 'Add Reminder'}
-            </Text>
-
-            <Text variant="bodyMedium" style={styles.reminderEventTitle}>
-              📅 {item.title}
-            </Text>
-
-            <TextInput
-              label="Reminder Note (Optional)"
-              value={reminderNote}
-              onChangeText={setReminderNote}
-              multiline
-              numberOfLines={3}
-              style={styles.reminderInput}
-              placeholder="Add a custom note for this reminder..."
-            />
-
-            <View style={styles.modalActions}>
-              <Button
-                mode="outlined"
-                onPress={() => setReminderModalVisible(false)}
-                disabled={loading}
-              >
-                Cancel
-              </Button>
-              <Button
-                mode="contained"
-                onPress={handleSaveReminder}
-                loading={loading}
-                disabled={loading}
-              >
-                {hasReminder ? 'Update' : 'Add'} Reminder
-              </Button>
-            </View>
+            <Text variant="titleMedium" style={styles.modalTitle}>{it.title}</Text>
+            <Text variant="bodyMedium"><Text style={styles.label}>Subject:</Text> {it.custom_subject || it.subject || 'N/A'}</Text>
+            <Text variant="bodyMedium"><Text style={styles.label}>Message:</Text> {it.custom_message || 'No message available.'}</Text>
+            <Text variant="bodyMedium"><Text style={styles.label}>Event Type:</Text> {it.event_type || '—'}</Text>
+            <Text variant="bodyMedium"><Text style={styles.label}>Service:</Text> {it.service_name || '—'}</Text>
+            <Button mode="outlined" style={styles.modalClose} onPress={() => setVisible(false)}>Close</Button>
           </Surface>
         </Modal>
       </Portal>
@@ -201,63 +201,17 @@ const AgendaItem = ({ item }: ItemProps) => {
 export default React.memo(AgendaItem);
 
 const styles = StyleSheet.create({
-  item: {
-    padding: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderBottomWidth: 1,
-  },
-  itemTitleText: {
-    marginLeft: 16,
-    fontWeight: 'bold',
-    fontSize: 16,
-    flex: 1,
-  },
-  itemButtonContainer: {
-    justifyContent: 'center',
-    flexDirection: 'row',
-    gap: 8,
-  },
-  emptyItem: {
-    paddingLeft: 20,
-    height: 52,
-    justifyContent: 'center',
-    borderBottomWidth: 1,
-  },
-  emptyItemText: {
-    fontSize: 14,
-  },
-  modalContent: {
-    margin: 20,
-    borderRadius: 8,
-    padding: 20,
-  },
-  modalSurface: {
-    padding: 10,
-    borderRadius: 8,
-  },
-  modalTitle: {
-    fontWeight: 'bold',
-    marginBottom: 10,
-    textAlign: 'center',
-  },
-  label: {
-    fontWeight: '600',
-  },
-  modalClose: {
-    marginTop: 15,
-  },
-  reminderEventTitle: {
-    marginBottom: 16,
-    textAlign: 'center',
-    fontWeight: '500',
-  },
-  reminderInput: {
-    marginBottom: 16,
-  },
-  modalActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    gap: 12,
-  },
+  item: { padding: 16, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1 },
+  textCol: { flex: 1, paddingRight: 12 },
+  title: { fontWeight: 'bold', fontSize: 16 },
+  subtitle: { marginTop: 4, fontSize: 12 },
+  actions: { flexDirection: 'row', alignItems: 'center' },
+  iconBtn: { marginHorizontal: 2 },
+  emptyItem: { paddingLeft: 16, height: 52, justifyContent: 'center', borderBottomWidth: 1 },
+  emptyItemText: { fontSize: 14 },
+  modalContent: { margin: 20, borderRadius: 8, padding: 20 },
+  modalSurface: { padding: 10, borderRadius: 8 },
+  modalTitle: { fontWeight: 'bold', marginBottom: 10 },
+  label: { fontWeight: '600' },
+  modalClose: { marginTop: 20, alignSelf: 'flex-end' },
 });

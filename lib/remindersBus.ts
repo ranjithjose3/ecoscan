@@ -1,39 +1,25 @@
 // lib/remindersBus.ts
-type RemindersBusEvent = {
+export type ReminderChange = {
   event_id: number;
   place_id: string;
   hasReminder: boolean;
 };
 
-type Listener = (event?: RemindersBusEvent) => void;
+type Listener = (change: ReminderChange) => void;
 
 class RemindersBus {
-  private listeners: Listener[] = [];
+  private listeners = new Set<Listener>();
 
-  on(listener: Listener): () => void {
-    this.listeners.push(listener);
-    
-    // Return unsubscribe function
-    return () => {
-      const index = this.listeners.indexOf(listener);
-      if (index > -1) {
-        this.listeners.splice(index, 1);
-      }
-    };
+  on(listener: Listener) {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
   }
 
-  emit(event?: RemindersBusEvent): void {
-    this.listeners.forEach(listener => {
-      try {
-        listener(event);
-      } catch (error) {
-        console.error('Error in reminders bus listener:', error);
-      }
-    });
-  }
-
-  removeAllListeners(): void {
-    this.listeners = [];
+  emit(change: ReminderChange) {
+    // fire-and-forget to all listeners
+    for (const l of Array.from(this.listeners)) {
+      try { l(change); } catch { /* noop */ }
+    }
   }
 }
 

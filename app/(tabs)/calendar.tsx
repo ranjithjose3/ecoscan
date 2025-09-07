@@ -1,34 +1,19 @@
+// app/(tabs)/calendar.tsx (or wherever your CalendarScreen lives)
 import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
-import {
-  Animated,
-  Easing,
-  StyleSheet,
-  View,
-  TouchableOpacity,
-  Text as RNText
-} from 'react-native';
-import {
-  ExpandableCalendar,
-  AgendaList,
-  CalendarProvider,
-  WeekCalendar
-} from 'react-native-calendars';
-import { Text, useTheme,TouchableRipple,IconButton} from 'react-native-paper';
-import { useFocusEffect,useRouter } from 'expo-router';
+import { Animated, Easing, StyleSheet, View, TouchableOpacity } from 'react-native';
+import { ExpandableCalendar, AgendaList, CalendarProvider, WeekCalendar } from 'react-native-calendars';
+import { Text, useTheme, IconButton } from 'react-native-paper';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import ScreenLayout from '../../components/ScreenLayout';
 import { useLocation } from '../../context/LocationContext';
-import {
-  getMarkedDatesFromDb,
-  getAgendaItemsFromDb,
-  fmt
-} from '../../utils/eventsData';
+import { getMarkedDatesFromDb, getAgendaItemsFromDb, fmt } from '../../utils/eventsData';
+import { syncEventsForPlaceFlexible } from '../../services/EventsService'; // ⬅️ ADD THIS
 import AgendaItem from '../../components/calender/AgendaItem';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import Constants from 'expo-constants';
 const CALENDAR_MONTHS_AHEAD = Number(Constants.expoConfig?.extra?.CALENDAR_MONTHS_AHEAD) || 3;
-
 const CHEVRON = require('../../assets/img/next.png');
 
 export default function CalendarScreen({ weekView = false }: { weekView?: boolean }) {
@@ -71,8 +56,7 @@ export default function CalendarScreen({ weekView = false }: { weekView?: boolea
     }).start();
   }, [rotation]);
 
-  const renderHeader = useCallback(
-  (date) => {
+  const renderHeader = useCallback((date) => {
     const rotateChevron = rotation.interpolate({
       inputRange: [0, 1],
       outputRange: ['0deg', '-180deg'],
@@ -89,23 +73,40 @@ export default function CalendarScreen({ weekView = false }: { weekView?: boolea
         />
       </TouchableOpacity>
     );
-  },
-  [toggleCalendarExpansion, rotation, theme.colors.onSurface]
-);
+  }, [toggleCalendarExpansion, rotation, theme.colors.onSurface]);
 
-
-  const loadFromDb = useCallback(async () => {
+  // ⬇️ NEW: load → if empty then sync → reload
+  const loadAndSyncIfEmpty = useCallback(async () => {
     if (!location?.place_id) {
       setMarkedDates({});
       setSections([]);
       return;
     }
+
     setLoading(true);
     try {
-      const [md, items] = await Promise.all([
+      let [md, items] = await Promise.all([
         getMarkedDatesFromDb(location.place_id, after, before),
         getAgendaItemsFromDb(location.place_id, after, before),
       ]);
+
+      // If APK is fresh (empty DB), do a one-time sync for the visible window
+      if (items.length === 0) {
+        console.log('[Calendar] No items in DB for range, syncing…', { place: location.place_id, after, before });
+        const { saved, total } = await syncEventsForPlaceFlexible({
+          placeId: location.place_id,
+          startDate: after,
+          endDate: before,
+        });
+        console.log('[Calendar] Sync done', { saved, total });
+
+        // Reload from DB after sync
+        [md, items] = await Promise.all([
+          getMarkedDatesFromDb(location.place_id, after, before),
+          getAgendaItemsFromDb(location.place_id, after, before),
+        ]);
+      }
+
       setMarkedDates(md);
       setSections(items);
     } catch (err) {
@@ -115,25 +116,20 @@ export default function CalendarScreen({ weekView = false }: { weekView?: boolea
     }
   }, [location?.place_id, after, before]);
 
-  // 🔁 Reload when location or sync time changes
+  // Reload when location or sync time changes
   useEffect(() => {
-    if (location?.place_id) {
-      loadFromDb();
-    }
-  }, [location?.place_id, lastSyncAt, after, before]);
+    if (location?.place_id) loadAndSyncIfEmpty();
+  }, [location?.place_id, lastSyncAt, after, before, loadAndSyncIfEmpty]);
 
-  // 🔁 Reload when screen is focused
+  // Reload when screen is focused
   useFocusEffect(
     useCallback(() => {
-      if (location?.place_id) {
-        loadFromDb();
-      }
-    }, [location?.place_id, after, before])
+      if (location?.place_id) loadAndSyncIfEmpty();
+    }, [location?.place_id, after, before, loadAndSyncIfEmpty])
   );
 
-  const renderItem = useCallback(({ item }: any) => <AgendaItem key={item.id} item={item} />, []);
+  const renderItem = useCallback(({ item }: any) => <AgendaItem item={item} />, []);
 
-  // Show loading only if no data loaded yet
   if (loading && sections.length === 0) {
     return (
       <ScreenLayout title="Event Calendar" subtitle="Loading..." scrollable={false}>
@@ -150,28 +146,23 @@ export default function CalendarScreen({ weekView = false }: { weekView?: boolea
         scrollable={false}
         contentStyle={{ paddingHorizontal: 1, paddingVertical: 0 }}
       >
-      {location?.title && (
-        <View style={styles.locationRow}>
-          <View style={[styles.rowContent, { backgroundColor: theme.colors.elevation?.level1 || theme.colors.surface }]}>
-            <MaterialCommunityIcons name="map-marker" size={22} color={theme.colors.primary} />
-            <Text
-              variant="titleSmall"
-              style={[styles.locationText, { color: theme.colors.onSurface }]}
-              numberOfLines={1}
-            >
-              {location.title}
-            </Text>
-            <IconButton
-              icon="pencil"
-              size={20}
-              onPress={() => router.push('/')}
-              iconColor={theme.colors.primary}
-              accessibilityLabel="Change Location"
-            />
+        {location?.title && (
+          <View style={styles.locationRow}>
+            <View style={[styles.rowContent, { backgroundColor: theme.colors.elevation?.level1 || theme.colors.surface }]}>
+              <MaterialCommunityIcons name="map-marker" size={22} color={theme.colors.primary} />
+              <Text variant="titleSmall" style={[styles.locationText, { color: theme.colors.onSurface }]} numberOfLines={1}>
+                {location.title}
+              </Text>
+              <IconButton
+                icon="pencil"
+                size={20}
+                onPress={() => router.push('/')}
+                iconColor={theme.colors.primary}
+                accessibilityLabel="Change Location"
+              />
+            </View>
           </View>
-        </View>
-      )}
-
+        )}
 
         {weekView ? (
           <WeekCalendar markedDates={markedDates} firstDay={1} />
@@ -216,6 +207,8 @@ export default function CalendarScreen({ weekView = false }: { weekView?: boolea
         <AgendaList
           sections={sections}
           renderItem={renderItem}
+          keyExtractor={(it: any) => `${it.place_id}:${it.id}:${it.day}`}
+          extraData={`${location?.place_id || ''}|${lastSyncAt}|${after}|${before}`}
           sectionStyle={{
             backgroundColor: theme.colors.elevation?.level1 || theme.colors.surface,
             padding: 4,
@@ -227,29 +220,9 @@ export default function CalendarScreen({ weekView = false }: { weekView?: boolea
 }
 
 const styles = StyleSheet.create({
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginVertical: 10,
-  },
-  headerTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginRight: 6,
-  },
-  locationRow: {
-    overflow: 'hidden',
-  },
-  rowContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 1,
-    backgroundColor: 'rgba(0,0,0,0.03)',
-  },
-  locationText: {
-    flex: 1,
-    marginLeft: 8,
-  },
+  header: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginVertical: 10 },
+  headerTitle: { fontSize: 16, fontWeight: 'bold', marginRight: 6 },
+  locationRow: { overflow: 'hidden' },
+  rowContent: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 1, backgroundColor: 'rgba(0,0,0,0.03)' },
+  locationText: { flex: 1, marginLeft: 8 },
 });
