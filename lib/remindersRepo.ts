@@ -1,12 +1,12 @@
 // lib/remindersRepo.ts
-import { getAll, getFirst, run, getDb } from './db';
+import { getAll, getFirst, run } from './db';
 
 export type ReminderRow = {
   id: number;
   event_id: number;
   place_id: string;
 
-  event_date: string;                 // normalized in SELECT via COALESCE
+  event_date: string;                 // YYYY-MM-DD
   note?: string | null;
 
   // snapshots for UI
@@ -21,40 +21,9 @@ export type ReminderRow = {
 
 export type NewReminder = Omit<ReminderRow, 'id' | 'created_at' | 'updated_at'>;
 
-// ------- schema probe (cached) -------
-let _hasRemindDate: boolean | null = null;
-async function hasRemindDateColumn(): Promise<boolean> {
-  if (_hasRemindDate != null) return _hasRemindDate;
-  const db = await getDb();
-  const cols = await db.getAllAsync<{ name: string }>(`PRAGMA table_info(reminders)`);
-  _hasRemindDate = cols.some(c => c.name === 'remind_date');
-  return _hasRemindDate!;
-}
-
-// ------- upsert (writes remind_date if legacy column exists) -------
+// ------- upsert -------
 export async function upsertReminder(r: NewReminder) {
-  const legacy = await hasRemindDateColumn();
-
-  const sql = legacy
-    ? `
-      INSERT INTO reminders (
-        event_id, place_id, event_date, remind_date, note,
-        place_title, event_title, service_name, event_type
-      )
-      VALUES (
-        $event_id, $place_id, $event_date, $event_date, $note,
-        $place_title, $event_title, $service_name, $event_type
-      )
-      ON CONFLICT(event_id, place_id) DO UPDATE SET
-        event_date   = excluded.event_date,
-        remind_date  = excluded.event_date,
-        note         = excluded.note,
-        place_title  = excluded.place_title,
-        event_title  = excluded.event_title,
-        service_name = excluded.service_name,
-        event_type   = excluded.event_type
-    `
-    : `
+  const sql = `
       INSERT INTO reminders (
         event_id, place_id, event_date, note,
         place_title, event_title, service_name, event_type
@@ -84,10 +53,10 @@ export async function upsertReminder(r: NewReminder) {
   });
 }
 
-// ------- reads (normalize date with COALESCE so old rows work) -------
+// ------- reads -------
 const SELECT_BASE = `
   id, event_id, place_id,
-  COALESCE(event_date, remind_date) AS event_date,
+  event_date AS event_date,
   note, place_title, event_title, service_name, event_type,
   created_at, updated_at
 `;
@@ -114,7 +83,7 @@ export async function listAllReminders() {
   return getAll<ReminderRow>(
     `SELECT ${SELECT_BASE}
        FROM reminders
-      ORDER BY COALESCE(event_date, remind_date) ASC, id ASC`
+      ORDER BY event_date ASC, id ASC`
   );
 }
 
@@ -123,7 +92,7 @@ export async function listRemindersByPlace(placeId: string) {
     `SELECT ${SELECT_BASE}
        FROM reminders
       WHERE place_id = ?
-      ORDER BY COALESCE(event_date, remind_date) ASC, id ASC`,
+      ORDER BY event_date ASC, id ASC`,
     [placeId]
   );
 }
@@ -133,9 +102,9 @@ export async function listRemindersByPlaceAndRange(placeId: string, after: strin
     `SELECT ${SELECT_BASE}
        FROM reminders
       WHERE place_id = ?
-        AND COALESCE(event_date, remind_date) >= ?
-        AND COALESCE(event_date, remind_date) <= ?
-      ORDER BY COALESCE(event_date, remind_date) ASC, id ASC`,
+        AND event_date >= ?
+        AND event_date <= ?
+      ORDER BY event_date ASC, id ASC`,
     [placeId, after, before]
   );
 }
@@ -146,7 +115,7 @@ export async function hasReminderOnDate(placeId: string, ymd: string) {
     `SELECT COUNT(1) AS c
        FROM reminders
       WHERE place_id = ?
-        AND COALESCE(event_date, remind_date) = ?
+        AND event_date = ?
       LIMIT 1`,
     [placeId, ymd]
   );
