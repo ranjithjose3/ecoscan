@@ -1,6 +1,6 @@
 import React from "react";
 import { StyleSheet, Image, ScrollView } from "react-native";
-import { Card, Text, IconButton, useTheme, List } from "react-native-paper";
+import { Card, Text, IconButton, useTheme, List,FAB, Button  } from "react-native-paper";
 
 interface EcoScanResultCardProps {
   result: any;
@@ -26,8 +26,7 @@ export default function EcoScanResultCard({ result, onRescan }: EcoScanResultCar
         >
           Detected Objects
         </Text>
-
-        <ScrollView style={{ maxHeight: 250 }}>
+        <ScrollView style={{ flexGrow: 1 }}>
           <List.AccordionGroup>
             {result.objects.map((obj: any, index: number) => (
               <List.Accordion
@@ -48,18 +47,21 @@ export default function EcoScanResultCard({ result, onRescan }: EcoScanResultCar
           </List.AccordionGroup>
         </ScrollView>
       </Card.Content>
+      <Card.Actions style={styles.actions}>
+        <Button
+          mode="contained"
+          buttonColor={theme.colors.primary}
+          onPress={onRescan}
+          style={{ flex: 1 }}
+        >
+          Rescan
+        </Button>
+      </Card.Actions>
+      
 
       {/* Floating Re-scan Button */}
-      <IconButton
-        icon="refresh"
-        size={30}
-        onPress={onRescan}
-        style={[
-          styles.rescanButton,
-          { backgroundColor: theme.colors.primary },
-        ]}
-        iconColor={theme.colors.onPrimary}
-      />
+      
+      
     </Card>
   );
 }

@@ -58,11 +58,14 @@ const AgendaItem = ({ item }: ItemProps) => {
       // Extract event ID from the item ID (format: "eventId-date")
       const eventId = parseInt(item.id.split('-')[0]);
       const eventDate = item.id.split('-').slice(1).join('-'); // Get date part
+      console.log('Saving reminder for event:', eventId, 'at location:', location.place_id, 'on date:', eventDate);
+
 
       const newReminder: NewReminder = {
         event_id: eventId,
         place_id: location.place_id,
         event_date: eventDate,
+        remind_date: eventDate,
         note: reminderNote.trim() || null,
         place_title: location.title,
         event_title: item.title,

@@ -7,6 +7,7 @@ export type ReminderRow = {
   place_id: string;
 
   event_date: string;                 // YYYY-MM-DD
+  remind_date: string;
   note?: string | null;
 
   // snapshots for UI
@@ -25,11 +26,11 @@ export type NewReminder = Omit<ReminderRow, 'id' | 'created_at' | 'updated_at'>;
 export async function upsertReminder(r: NewReminder) {
   const sql = `
       INSERT INTO reminders (
-        event_id, place_id, event_date, note,
+        event_id, place_id, event_date,remind_date, note,
         place_title, event_title, service_name, event_type
       )
       VALUES (
-        $event_id, $place_id, $event_date, $note,
+        $event_id, $place_id, $event_date, $remind_date, $note,
         $place_title, $event_title, $service_name, $event_type
       )
       ON CONFLICT(event_id, place_id) DO UPDATE SET
@@ -45,6 +46,7 @@ export async function upsertReminder(r: NewReminder) {
     $event_id: r.event_id,
     $place_id: r.place_id,
     $event_date: r.event_date,
+    $remind_date: r.remind_date,
     $note: r.note ?? null,
     $place_title: r.place_title ?? null,
     $event_title: r.event_title ?? null,
@@ -57,6 +59,7 @@ export async function upsertReminder(r: NewReminder) {
 const SELECT_BASE = `
   id, event_id, place_id,
   event_date AS event_date,
+  remind_date AS remind_date, 
   note, place_title, event_title, service_name, event_type,
   created_at, updated_at
 `;

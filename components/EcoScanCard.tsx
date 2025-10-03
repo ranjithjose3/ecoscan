@@ -5,12 +5,14 @@ import EcoScanInfoCard from "./ecoscan/EcoScanInfoCard";
 import EcoScanPreviewCard from "./ecoscan/EcoScanPreviewCard";
 import EcoScanResultCard from "./ecoscan/EcoScanResultCard";
 import { EcoScanService } from "../services/EcoScanService";
+import MovableFAB from "./MovableFAB";
+import { FAB, useTheme } from "react-native-paper";
 
 export default function EcoScanCard() {
   const [photo, setPhoto] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any | null>(null);
-
+   const theme = useTheme();
   const handleCapture = async () => {
   const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== "granted") {
@@ -56,8 +58,16 @@ export default function EcoScanCard() {
 
   // Decide which card to show
   if (result) {
-    return <EcoScanResultCard result={result} onRescan={handleRescan} />;
+    return (
+      <>
+        <EcoScanResultCard result={result} onRescan={handleRescan} />
+
+        {/* Floating Rescan Button */}
+       <MovableFAB onPress={handleRescan} />
+      </>
+    );
   }
+
   if (photo) {
     return (
       <EcoScanPreviewCard

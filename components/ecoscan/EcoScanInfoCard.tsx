@@ -25,6 +25,6 @@ export default function EcoScanInfoCard({ onCapture }: InfoProps) {
 }
 
 const styles = StyleSheet.create({
-  card: { marginTop: 4,margin:0,padding: 0, borderRadius: 0, overflow: "hidden" },
+  card: { marginTop: 4,marginBottom:4,padding: 0, borderRadius: 0, overflow: "hidden" },
   actions: { justifyContent: "space-between", padding: 8 },
 });
